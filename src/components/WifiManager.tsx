@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Wifi, LogOut, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -24,7 +23,7 @@ interface Plan {
 }
 
 const WifiManager = () => {
-  const { user, loading, signOut } = useAuth();
+  const { user, session, loading, signOut } = useAuth();
   const { data: plans = [], isLoading: plansLoading } = useDataPlans();
   const [currentView, setCurrentView] = useState<CurrentView>('auth');
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
@@ -50,7 +49,7 @@ const WifiManager = () => {
         try {
           const { data, error } = await supabase.functions.invoke('get-user-session', {
             headers: {
-              Authorization: `Bearer ${user.session?.access_token}`,
+              Authorization: `Bearer ${session?.access_token}`,
             },
           });
 
@@ -78,7 +77,7 @@ const WifiManager = () => {
     };
 
     checkUserSession();
-  }, [user, isAdmin]);
+  }, [user, session, isAdmin]);
 
   const handleAdminAccess = () => {
     setIsAdmin(true);
