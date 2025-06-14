@@ -1,1 +1,16 @@
+
 project_id = "mxaletskzrvaugifpfak"
+
+[functions]
+# Global function settings
+[functions.create-payment]
+verify_jwt = true
+
+[functions.process-payment]
+verify_jwt = false
+
+[functions.get-user-session]
+verify_jwt = true
+
+[functions.admin-stats]
+verify_jwt = false
