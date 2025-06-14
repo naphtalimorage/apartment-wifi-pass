@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Wifi, LogOut, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -57,6 +58,7 @@ const WifiManager = () => {
 
           if (error) {
             console.error('Error checking session:', error);
+            // If session check fails, default to showing plans
             setCurrentView('plans');
           } else if (data?.hasActiveSession) {
             setCurrentView('dashboard');
@@ -65,6 +67,7 @@ const WifiManager = () => {
           }
         } catch (error) {
           console.error('Failed to check session:', error);
+          // If session check fails completely, default to showing plans
           setCurrentView('plans');
         } finally {
           setCheckingSession(false);
