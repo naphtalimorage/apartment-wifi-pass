@@ -10,6 +10,7 @@ import PaymentFlow from './PaymentFlow';
 import UserDashboard from './UserDashboard';
 import AdminPanel from './AdminPanel';
 import { useDataPlans } from '@/hooks/useDataPlans';
+import { supabase } from '@/integrations/supabase/client';
 
 type CurrentView = 'auth' | 'plans' | 'payment' | 'dashboard' | 'admin';
 
@@ -28,6 +29,7 @@ const WifiManager = () => {
   const [currentView, setCurrentView] = useState<CurrentView>('auth');
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(false);
 
   // Convert database plans to component format
   const formattedPlans: Plan[] = plans.map(plan => ({
@@ -40,13 +42,43 @@ const WifiManager = () => {
   }));
 
   useEffect(() => {
-    if (user) {
-      // Check if user has active session, otherwise show plans
-      setCurrentView('plans');
-    } else {
-      setCurrentView('auth');
-    }
-  }, [user]);
+    const checkUserSession = async () => {
+      if (user && !isAdmin) {
+        setCheckingSession(true);
+        console.log('Checking for active session for user:', user.id);
+        
+        try {
+          const { data, error } = await supabase.functions.invoke('get-user-session', {
+            headers: {
+              Authorization: `Bearer ${user.session?.access_token}`,
+            },
+          });
+
+          console.log('Session check response:', data);
+
+          if (error) {
+            console.error('Error checking session:', error);
+            setCurrentView('plans');
+          } else if (data?.hasActiveSession) {
+            setCurrentView('dashboard');
+          } else {
+            setCurrentView('plans');
+          }
+        } catch (error) {
+          console.error('Failed to check session:', error);
+          setCurrentView('plans');
+        } finally {
+          setCheckingSession(false);
+        }
+      } else if (user && isAdmin) {
+        setCurrentView('admin');
+      } else {
+        setCurrentView('auth');
+      }
+    };
+
+    checkUserSession();
+  }, [user, isAdmin]);
 
   const handleAdminAccess = () => {
     setIsAdmin(true);
@@ -69,12 +101,14 @@ const WifiManager = () => {
     setIsAdmin(false);
   };
 
-  if (loading) {
+  if (loading || checkingSession) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading...</p>
+          <p className="text-muted-foreground">
+            {loading ? 'Loading...' : 'Checking session...'}
+          </p>
         </div>
       </div>
     );
@@ -125,16 +159,29 @@ const WifiManager = () => {
         {currentView === 'auth' && <AuthForm />}
 
         {currentView === 'plans' && user && (
-          <PlanSelection 
-            plans={formattedPlans}
-            onSelectPlan={handlePlanSelect}
-            currentUser={{
-              id: user.id,
-              fullName: user.user_metadata?.full_name || user.email || 'User',
-              email: user.email || '',
-              phone: user.user_metadata?.phone_number || ''
-            }}
-          />
+          <>
+            {plansLoading ? (
+              <div className="text-center">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+                <p className="text-muted-foreground">Loading plans...</p>
+              </div>
+            ) : formattedPlans.length > 0 ? (
+              <PlanSelection 
+                plans={formattedPlans}
+                onSelectPlan={handlePlanSelect}
+                currentUser={{
+                  id: user.id,
+                  fullName: user.user_metadata?.full_name || user.email || 'User',
+                  email: user.email || '',
+                  phone: user.user_metadata?.phone_number || ''
+                }}
+              />
+            ) : (
+              <div className="text-center">
+                <p className="text-muted-foreground">No plans available at the moment.</p>
+              </div>
+            )}
+          </>
         )}
 
         {currentView === 'payment' && selectedPlan && user && (
