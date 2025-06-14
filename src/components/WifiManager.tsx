@@ -1,31 +1,17 @@
 
 import React, { useState, useEffect } from 'react';
-import { Wifi, Users, CreditCard, Timer, LogOut } from 'lucide-react';
+import { Wifi, LogOut, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import AuthForm from './AuthForm';
 import PlanSelection from './PlanSelection';
 import PaymentFlow from './PaymentFlow';
 import UserDashboard from './UserDashboard';
 import AdminPanel from './AdminPanel';
+import { useDataPlans } from '@/hooks/useDataPlans';
 
-type UserStatus = 'guest' | 'authenticated' | 'active' | 'admin';
 type CurrentView = 'auth' | 'plans' | 'payment' | 'dashboard' | 'admin';
-
-interface User {
-  id: string;
-  fullName: string;
-  email: string;
-  phone: string;
-  currentPlan?: {
-    type: string;
-    duration: string;
-    price: number;
-    expiresAt: Date;
-  };
-}
 
 interface Plan {
   id: string;
@@ -37,79 +23,34 @@ interface Plan {
 }
 
 const WifiManager = () => {
-  const [userStatus, setUserStatus] = useState<UserStatus>('guest');
+  const { user, loading, signOut } = useAuth();
+  const { data: plans = [], isLoading: plansLoading } = useDataPlans();
   const [currentView, setCurrentView] = useState<CurrentView>('auth');
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
-  const { toast } = useToast();
+  const [isAdmin, setIsAdmin] = useState(false);
 
-  const plans: Plan[] = [
-    {
-      id: '2hours',
-      name: '2 Hours',
-      duration: '2 hours',
-      price: 10,
-      features: ['High-speed internet', 'All websites & apps', 'Basic support']
-    },
-    {
-      id: '1day',
-      name: '1 Day',
-      duration: '24 hours',
-      price: 20,
-      features: ['High-speed internet', 'All websites & apps', 'Priority support', 'No daily limits'],
-      popular: true
-    },
-    {
-      id: '1week',
-      name: '1 Week',
-      duration: '7 days',
-      price: 150,
-      features: ['High-speed internet', 'All websites & apps', 'Premium support', 'Unlimited usage', 'Best value']
+  // Convert database plans to component format
+  const formattedPlans: Plan[] = plans.map(plan => ({
+    id: plan.id,
+    name: plan.name,
+    duration: `${plan.duration_hours} ${plan.duration_hours === 1 ? 'hour' : plan.duration_hours < 24 ? 'hours' : plan.duration_hours === 24 ? 'day' : 'days'}`,
+    price: plan.price_ksh,
+    features: plan.features || [],
+    popular: plan.popular || false
+  }));
+
+  useEffect(() => {
+    if (user) {
+      // Check if user has active session, otherwise show plans
+      setCurrentView('plans');
+    } else {
+      setCurrentView('auth');
     }
-  ];
+  }, [user]);
 
-  // Simulate admin login (in real app, this would be proper authentication)
   const handleAdminAccess = () => {
-    setUserStatus('admin');
+    setIsAdmin(true);
     setCurrentView('admin');
-  };
-
-  const handleLogin = (email: string, password: string) => {
-    // Simulate login - in real app, this would validate against your database
-    const mockUser: User = {
-      id: '1',
-      fullName: 'John Doe',
-      email: email,
-      phone: '+254700000000'
-    };
-    
-    setCurrentUser(mockUser);
-    setUserStatus('authenticated');
-    setCurrentView('plans');
-    
-    toast({
-      title: "Welcome back!",
-      description: "You've successfully logged in.",
-    });
-  };
-
-  const handleRegister = (userData: any) => {
-    // Simulate registration - in real app, this would save to your database
-    const newUser: User = {
-      id: Date.now().toString(),
-      fullName: userData.fullName,
-      email: userData.email,
-      phone: userData.phone
-    };
-    
-    setCurrentUser(newUser);
-    setUserStatus('authenticated');
-    setCurrentView('plans');
-    
-    toast({
-      title: "Account created!",
-      description: "Welcome to our WiFi network. Choose a plan to get started.",
-    });
   };
 
   const handlePlanSelect = (plan: Plan) => {
@@ -118,48 +59,26 @@ const WifiManager = () => {
   };
 
   const handlePaymentSuccess = () => {
-    if (selectedPlan && currentUser) {
-      const expiresAt = new Date();
-      if (selectedPlan.id === '2hours') {
-        expiresAt.setHours(expiresAt.getHours() + 2);
-      } else if (selectedPlan.id === '1day') {
-        expiresAt.setDate(expiresAt.getDate() + 1);
-      } else if (selectedPlan.id === '1week') {
-        expiresAt.setDate(expiresAt.getDate() + 7);
-      }
-
-      const updatedUser = {
-        ...currentUser,
-        currentPlan: {
-          type: selectedPlan.name,
-          duration: selectedPlan.duration,
-          price: selectedPlan.price,
-          expiresAt
-        }
-      };
-
-      setCurrentUser(updatedUser);
-      setUserStatus('active');
-      setCurrentView('dashboard');
-
-      toast({
-        title: "Payment successful!",
-        description: `Your ${selectedPlan.name} plan is now active. Enjoy your internet access!`,
-      });
-    }
+    setCurrentView('dashboard');
   };
 
-  const handleLogout = () => {
-    setCurrentUser(null);
-    setUserStatus('guest');
+  const handleLogout = async () => {
+    await signOut();
     setCurrentView('auth');
     setSelectedPlan(null);
-    
-    toast({
-      title: "Logged out",
-      description: "You've been logged out successfully.",
-    });
+    setIsAdmin(false);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50">
@@ -178,19 +97,19 @@ const WifiManager = () => {
             </div>
             
             <div className="flex items-center space-x-4">
-              {userStatus !== 'guest' && (
+              {user && (
                 <Badge variant="outline" className="hidden sm:flex">
-                  {userStatus === 'admin' ? 'Admin' : userStatus === 'active' ? 'Connected' : 'Authenticated'}
+                  {isAdmin ? 'Admin' : 'Authenticated'}
                 </Badge>
               )}
               
-              {userStatus === 'guest' && (
+              {!user && (
                 <Button variant="ghost" size="sm" onClick={handleAdminAccess}>
                   Admin
                 </Button>
               )}
               
-              {userStatus !== 'guest' && userStatus !== 'admin' && (
+              {user && !isAdmin && (
                 <Button variant="ghost" size="sm" onClick={handleLogout}>
                   <LogOut className="h-4 w-4 mr-1" />
                   Logout
@@ -203,33 +122,43 @@ const WifiManager = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        {currentView === 'auth' && (
-          <AuthForm 
-            onLogin={handleLogin}
-            onRegister={handleRegister}
-          />
-        )}
+        {currentView === 'auth' && <AuthForm />}
 
-        {currentView === 'plans' && (
+        {currentView === 'plans' && user && (
           <PlanSelection 
-            plans={plans}
+            plans={formattedPlans}
             onSelectPlan={handlePlanSelect}
-            currentUser={currentUser}
+            currentUser={{
+              id: user.id,
+              fullName: user.user_metadata?.full_name || user.email || 'User',
+              email: user.email || '',
+              phone: user.user_metadata?.phone_number || ''
+            }}
           />
         )}
 
-        {currentView === 'payment' && selectedPlan && (
+        {currentView === 'payment' && selectedPlan && user && (
           <PaymentFlow 
             plan={selectedPlan}
-            user={currentUser}
+            user={{
+              id: user.id,
+              fullName: user.user_metadata?.full_name || user.email || 'User',
+              email: user.email || '',
+              phone: user.user_metadata?.phone_number || ''
+            }}
             onPaymentSuccess={handlePaymentSuccess}
             onBack={() => setCurrentView('plans')}
           />
         )}
 
-        {currentView === 'dashboard' && currentUser && (
+        {currentView === 'dashboard' && user && (
           <UserDashboard 
-            user={currentUser}
+            user={{
+              id: user.id,
+              fullName: user.user_metadata?.full_name || user.email || 'User',
+              email: user.email || '',
+              phone: user.user_metadata?.phone_number || ''
+            }}
             onRenewPlan={() => setCurrentView('plans')}
           />
         )}
@@ -237,8 +166,8 @@ const WifiManager = () => {
         {currentView === 'admin' && (
           <AdminPanel 
             onBack={() => {
-              setUserStatus('guest');
-              setCurrentView('auth');
+              setIsAdmin(false);
+              setCurrentView(user ? 'plans' : 'auth');
             }}
           />
         )}

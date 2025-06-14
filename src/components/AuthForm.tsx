@@ -1,23 +1,19 @@
 
 import React, { useState } from 'react';
-import { User, LogIn } from 'lucide-react';
+import { User, LogIn, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
 
-interface AuthFormProps {
-  onLogin: (email: string, password: string) => void;
-  onRegister: (userData: {
-    fullName: string;
-    email: string;
-    phone: string;
-    password: string;
-  }) => void;
-}
+const AuthForm: React.FC = () => {
+  const { signIn, signUp } = useAuth();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
 
-const AuthForm: React.FC<AuthFormProps> = ({ onLogin, onRegister }) => {
   const [loginData, setLoginData] = useState({
     email: '',
     password: ''
@@ -31,23 +27,76 @@ const AuthForm: React.FC<AuthFormProps> = ({ onLogin, onRegister }) => {
     confirmPassword: ''
   });
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loginData.email && loginData.password) {
-      onLogin(loginData.email, loginData.password);
+    if (!loginData.email || !loginData.password) {
+      toast({
+        title: "Error",
+        description: "Please fill in all fields.",
+        variant: "destructive"
+      });
+      return;
     }
+
+    setLoading(true);
+    const { error } = await signIn(loginData.email, loginData.password);
+    
+    if (error) {
+      toast({
+        title: "Sign in failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+    setLoading(false);
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!registerData.fullName || !registerData.email || !registerData.phone || !registerData.password) {
+      toast({
+        title: "Error",
+        description: "Please fill in all fields.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (registerData.password !== registerData.confirmPassword) {
-      alert('Passwords do not match');
+      toast({
+        title: "Error",
+        description: "Passwords do not match.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (registerData.password.length < 6) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 6 characters long.",
+        variant: "destructive"
+      });
       return;
     }
     
-    if (registerData.fullName && registerData.email && registerData.phone && registerData.password) {
-      onRegister(registerData);
+    setLoading(true);
+    const { error } = await signUp(
+      registerData.email, 
+      registerData.password, 
+      registerData.fullName, 
+      registerData.phone
+    );
+    
+    if (error) {
+      toast({
+        title: "Sign up failed",
+        description: error.message,
+        variant: "destructive"
+      });
     }
+    setLoading(false);
   };
 
   return (
@@ -64,8 +113,8 @@ const AuthForm: React.FC<AuthFormProps> = ({ onLogin, onRegister }) => {
         <CardContent className="p-6">
           <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="login">Login</TabsTrigger>
-              <TabsTrigger value="register">Register</TabsTrigger>
+              <TabsTrigger value="login">Sign In</TabsTrigger>
+              <TabsTrigger value="register">Sign Up</TabsTrigger>
             </TabsList>
             
             <TabsContent value="login">
@@ -80,6 +129,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ onLogin, onRegister }) => {
                     onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
                     required
                     className="h-12"
+                    disabled={loading}
                   />
                 </div>
                 
@@ -93,12 +143,17 @@ const AuthForm: React.FC<AuthFormProps> = ({ onLogin, onRegister }) => {
                     onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
                     required
                     className="h-12"
+                    disabled={loading}
                   />
                 </div>
                 
-                <Button type="submit" className="w-full h-12 text-lg">
-                  <LogIn className="h-5 w-5 mr-2" />
-                  Login
+                <Button type="submit" className="w-full h-12 text-lg" disabled={loading}>
+                  {loading ? (
+                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                  ) : (
+                    <LogIn className="h-5 w-5 mr-2" />
+                  )}
+                  Sign In
                 </Button>
               </form>
             </TabsContent>
@@ -115,6 +170,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ onLogin, onRegister }) => {
                     onChange={(e) => setRegisterData({ ...registerData, fullName: e.target.value })}
                     required
                     className="h-12"
+                    disabled={loading}
                   />
                 </div>
                 
@@ -128,6 +184,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ onLogin, onRegister }) => {
                     onChange={(e) => setRegisterData({ ...registerData, phone: e.target.value })}
                     required
                     className="h-12"
+                    disabled={loading}
                   />
                 </div>
                 
@@ -141,6 +198,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ onLogin, onRegister }) => {
                     onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
                     required
                     className="h-12"
+                    disabled={loading}
                   />
                 </div>
                 
@@ -149,11 +207,12 @@ const AuthForm: React.FC<AuthFormProps> = ({ onLogin, onRegister }) => {
                   <Input
                     id="register-password"
                     type="password"
-                    placeholder="Create a password"
+                    placeholder="Create a password (min 6 characters)"
                     value={registerData.password}
                     onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
                     required
                     className="h-12"
+                    disabled={loading}
                   />
                 </div>
                 
@@ -167,11 +226,16 @@ const AuthForm: React.FC<AuthFormProps> = ({ onLogin, onRegister }) => {
                     onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })}
                     required
                     className="h-12"
+                    disabled={loading}
                   />
                 </div>
                 
-                <Button type="submit" className="w-full h-12 text-lg">
-                  <User className="h-5 w-5 mr-2" />
+                <Button type="submit" className="w-full h-12 text-lg" disabled={loading}>
+                  {loading ? (
+                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                  ) : (
+                    <User className="h-5 w-5 mr-2" />
+                  )}
                   Create Account
                 </Button>
               </form>
