@@ -14,3 +14,9 @@ verify_jwt = true
 
 [functions.admin-stats]
 verify_jwt = false
+
+[functions.manage-router-blacklist]
+verify_jwt = false
+
+[functions.session-monitor]
+verify_jwt = false

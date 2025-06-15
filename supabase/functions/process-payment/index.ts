@@ -80,6 +80,32 @@ serve(async (req) => {
 
       console.log('User session created:', session.id);
 
+      // Get user's MAC address and remove from blacklist
+      const { data: userDevices } = await supabaseClient
+        .from('user_devices')
+        .select('mac_address')
+        .eq('user_id', payment.user_id)
+        .limit(1);
+
+      if (userDevices && userDevices.length > 0) {
+        const macAddress = userDevices[0].mac_address;
+        
+        // Call router unblacklist function
+        const unblacklistResponse = await supabaseClient.functions.invoke('manage-router-blacklist', {
+          body: {
+            action: 'unblacklist',
+            macAddress: macAddress,
+            userId: payment.user_id
+          }
+        });
+
+        if (unblacklistResponse.error) {
+          console.error(`Failed to unblacklist user ${payment.user_id}:`, unblacklistResponse.error);
+        } else {
+          console.log(`Successfully unblacklisted user ${payment.user_id} with MAC ${macAddress}`);
+        }
+      }
+
       // Log the action
       await supabaseClient
         .from('usage_logs')
@@ -90,14 +116,15 @@ serve(async (req) => {
           details: {
             plan_name: payment.data_plans.name,
             duration_hours: payment.data_plans.duration_hours,
-            amount_paid: payment.amount_ksh
+            amount_paid: payment.amount_ksh,
+            auto_unblacklisted: true
           }
         });
 
       return new Response(JSON.stringify({
         success: true,
         sessionId: session.id,
-        message: "Payment processed and session created successfully"
+        message: "Payment processed, session created, and user unblacklisted successfully"
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
