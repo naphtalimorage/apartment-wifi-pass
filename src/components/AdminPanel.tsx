@@ -1,104 +1,147 @@
 
 import React, { useState } from 'react';
-import { Users, CreditCard, Wifi, Timer } from 'lucide-react';
+import { Users, CreditCard, Wifi, Timer, Shield, ShieldOff, RefreshCw, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/hooks/use-toast';
+import { useAdminData } from '@/hooks/useAdminData';
 
 interface AdminPanelProps {
   onBack: () => void;
 }
 
-// Mock data for demonstration
-const mockUsers = [
-  {
-    id: '1',
-    name: 'John Doe',
-    email: 'john@example.com',
-    phone: '+254700000001',
-    plan: '1 Week',
-    status: 'Active',
-    expiresAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
-    paidAmount: 150
-  },
-  {
-    id: '2',
-    name: 'Jane Smith',
-    email: 'jane@example.com',
-    phone: '+254700000002',
-    plan: '1 Day',
-    status: 'Active',
-    expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000),
-    paidAmount: 20
-  },
-  {
-    id: '3',
-    name: 'Bob Wilson',
-    email: 'bob@example.com',
-    phone: '+254700000003',
-    plan: '2 Hours',
-    status: 'Expired',
-    expiresAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-    paidAmount: 10
-  }
-];
-
-const mockPayments = [
-  {
-    id: '1',
-    user: 'John Doe',
-    phone: '+254700000001',
-    plan: '1 Week',
-    amount: 150,
-    date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-    status: 'Completed'
-  },
-  {
-    id: '2',
-    user: 'Jane Smith',
-    phone: '+254700000002',
-    plan: '1 Day',
-    amount: 20,
-    date: new Date(Date.now() - 4 * 60 * 60 * 1000),
-    status: 'Completed'
-  },
-  {
-    id: '3',
-    user: 'Bob Wilson',
-    phone: '+254700000003',
-    plan: '2 Hours',
-    amount: 10,
-    date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-    status: 'Completed'
-  }
-];
-
 const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
-  const [users] = useState(mockUsers);
-  const [payments] = useState(mockPayments);
+  const { toast } = useToast();
+  const {
+    activeSessions,
+    userDevices,
+    loading,
+    error,
+    blacklistUser,
+    unblacklistUser,
+    monitorSessions,
+    refetch
+  } = useAdminData();
+  
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  const activeUsers = users.filter(user => user.status === 'Active').length;
-  const totalRevenue = payments.reduce((sum, payment) => sum + payment.amount, 0);
-  const todayRevenue = payments
-    .filter(payment => payment.date.toDateString() === new Date().toDateString())
-    .reduce((sum, payment) => sum + payment.amount, 0);
+  const handleBlacklistUser = async (userId: string, macAddress: string, userName: string) => {
+    setActionLoading(userId);
+    const result = await blacklistUser(userId, macAddress);
+    setActionLoading(null);
 
-  const handleDisconnectUser = (userId: string) => {
-    console.log(`Disconnecting user ${userId}`);
-    // In real implementation, this would call your backend API
+    if (result.success) {
+      toast({
+        title: "User Blacklisted",
+        description: `${userName} has been disconnected and blacklisted.`,
+      });
+    } else {
+      toast({
+        title: "Error",
+        description: result.error || "Failed to blacklist user",
+        variant: "destructive",
+      });
+    }
   };
+
+  const handleUnblacklistUser = async (userId: string, macAddress: string, userName: string) => {
+    setActionLoading(userId);
+    const result = await unblacklistUser(userId, macAddress);
+    setActionLoading(null);
+
+    if (result.success) {
+      toast({
+        title: "User Unblacklisted",
+        description: `${userName} has been removed from blacklist.`,
+      });
+    } else {
+      toast({
+        title: "Error",
+        description: result.error || "Failed to unblacklist user",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleMonitorSessions = async () => {
+    setActionLoading('monitor');
+    const result = await monitorSessions();
+    setActionLoading(null);
+
+    if (result.success) {
+      toast({
+        title: "Session Monitor",
+        description: "Expired sessions have been processed and users blacklisted.",
+      });
+    } else {
+      toast({
+        title: "Error",
+        description: result.error || "Failed to monitor sessions",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const formatTimeRemaining = (endTime: string) => {
+    const now = new Date();
+    const end = new Date(endTime);
+    const diff = end.getTime() - now.getTime();
+    
+    if (diff <= 0) return "Expired";
+    
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    
+    return `${hours}h ${minutes}m`;
+  };
+
+  const totalRevenue = activeSessions.reduce((sum, session) => sum + session.payments.amount_ksh, 0);
+
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto flex items-center justify-center h-64">
+        <RefreshCw className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Loading admin data...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center text-red-600 p-8">
+          <p>{error}</p>
+          <Button onClick={() => refetch()} className="mt-4">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto animate-fade-in-up">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h2 className="text-3xl font-bold text-foreground mb-2">Admin Dashboard</h2>
-          <p className="text-muted-foreground">Manage your WiFi network and users</p>
+          <h2 className="text-3xl font-bold text-foreground mb-2">WiFi Admin Dashboard</h2>
+          <p className="text-muted-foreground">Manage your network and monitor user sessions</p>
         </div>
-        <Button variant="outline" onClick={onBack}>
-          Back to Portal
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={handleMonitorSessions}
+            disabled={actionLoading === 'monitor'}
+          >
+            <Play className="h-4 w-4 mr-2" />
+            {actionLoading === 'monitor' ? 'Monitoring...' : 'Check Expired Sessions'}
+          </Button>
+          <Button variant="outline" onClick={onBack}>
+            Back to Portal
+          </Button>
+        </div>
       </div>
 
       {/* Stats Overview */}
@@ -108,8 +151,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
             <div className="flex items-center">
               <Users className="h-8 w-8 text-primary" />
               <div className="ml-4">
-                <p className="text-2xl font-bold">{activeUsers}</p>
-                <p className="text-sm text-muted-foreground">Active Users</p>
+                <p className="text-2xl font-bold">{activeSessions.length}</p>
+                <p className="text-sm text-muted-foreground">Active Sessions</p>
               </div>
             </div>
           </CardContent>
@@ -121,19 +164,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
               <CreditCard className="h-8 w-8 text-success" />
               <div className="ml-4">
                 <p className="text-2xl font-bold">Ksh {totalRevenue}</p>
-                <p className="text-sm text-muted-foreground">Total Revenue</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <Timer className="h-8 w-8 text-warning" />
-              <div className="ml-4">
-                <p className="text-2xl font-bold">Ksh {todayRevenue}</p>
-                <p className="text-sm text-muted-foreground">Today's Revenue</p>
+                <p className="text-sm text-muted-foreground">Active Revenue</p>
               </div>
             </div>
           </CardContent>
@@ -144,8 +175,22 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
             <div className="flex items-center">
               <Wifi className="h-8 w-8 text-info" />
               <div className="ml-4">
-                <p className="text-2xl font-bold">{users.length}</p>
-                <p className="text-sm text-muted-foreground">Total Users</p>
+                <p className="text-2xl font-bold">{userDevices.length}</p>
+                <p className="text-sm text-muted-foreground">Registered Devices</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <Timer className="h-8 w-8 text-warning" />
+              <div className="ml-4">
+                <p className="text-2xl font-bold">
+                  {activeSessions.filter(s => new Date(s.end_time) <= new Date()).length}
+                </p>
+                <p className="text-sm text-muted-foreground">Expired Sessions</p>
               </div>
             </div>
           </CardContent>
@@ -153,164 +198,149 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
       </div>
 
       {/* Detailed Views */}
-      <Tabs defaultValue="users" className="space-y-6">
+      <Tabs defaultValue="sessions" className="space-y-6">
         <TabsList>
-          <TabsTrigger value="users">Connected Users</TabsTrigger>
-          <TabsTrigger value="payments">Payment History</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsTrigger value="sessions">Active Sessions</TabsTrigger>
+          <TabsTrigger value="devices">User Devices</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="users">
+        <TabsContent value="sessions">
           <Card>
             <CardHeader>
-              <CardTitle>Connected Users</CardTitle>
+              <CardTitle>Currently Connected Users</CardTitle>
               <CardDescription>
-                Manage all users connected to your WiFi network
+                Real-time view of active internet sessions with manual controls
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {users.map((user) => (
-                  <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-4">
-                        <div>
-                          <h4 className="font-medium">{user.name}</h4>
-                          <p className="text-sm text-muted-foreground">{user.email}</p>
-                          <p className="text-sm text-muted-foreground">{user.phone}</p>
+                {activeSessions.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">
+                    No active sessions found
+                  </p>
+                ) : (
+                  activeSessions.map((session) => {
+                    const timeRemaining = formatTimeRemaining(session.end_time);
+                    const isExpired = new Date(session.end_time) <= new Date();
+                    
+                    return (
+                      <div key={session.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-4">
+                            <div>
+                              <h4 className="font-medium">{session.users.full_name}</h4>
+                              <p className="text-sm text-muted-foreground">{session.users.email}</p>
+                              <p className="text-sm text-muted-foreground">{session.users.phone_number}</p>
+                            </div>
+                            <div className="text-center">
+                              <Badge variant={isExpired ? 'destructive' : 'default'}>
+                                {timeRemaining}
+                              </Badge>
+                              <p className="text-sm text-muted-foreground mt-1">{session.data_plans.name}</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-sm font-medium">MAC: {session.mac_address || 'Not set'}</p>
+                              <p className="text-sm text-muted-foreground">IP: {session.ip_address || 'Not set'}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-medium">Ksh {session.payments.amount_ksh}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Data: {session.data_used_mb || 0} MB
+                              </p>
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-center">
-                          <Badge variant={user.status === 'Active' ? 'default' : 'secondary'}>
-                            {user.status}
-                          </Badge>
-                          <p className="text-sm text-muted-foreground mt-1">{user.plan}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-medium">Ksh {user.paidAmount}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Expires: {user.expiresAt.toLocaleDateString()}
-                          </p>
+                        <div className="ml-4 flex gap-2">
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleBlacklistUser(
+                              session.user_id, 
+                              session.mac_address, 
+                              session.users.full_name
+                            )}
+                            disabled={!session.mac_address || actionLoading === session.user_id}
+                          >
+                            <Shield className="h-4 w-4 mr-1" />
+                            {actionLoading === session.user_id ? 'Processing...' : 'Blacklist'}
+                          </Button>
+                          {!session.mac_address && (
+                            <Badge variant="outline" className="text-xs">
+                              No MAC Address
+                            </Badge>
+                          )}
                         </div>
                       </div>
-                    </div>
-                    <div className="ml-4">
-                      {user.status === 'Active' && (
+                    );
+                  })
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="devices">
+          <Card>
+            <CardHeader>
+              <CardTitle>Registered User Devices</CardTitle>
+              <CardDescription>
+                View and manage user devices for blacklist control
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {userDevices.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">
+                    No devices registered yet
+                  </p>
+                ) : (
+                  userDevices.map((device) => (
+                    <div key={device.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-4">
+                          <div>
+                            <h4 className="font-medium">{device.device_name || 'Unnamed Device'}</h4>
+                            <p className="text-sm text-muted-foreground">MAC: {device.mac_address}</p>
+                          </div>
+                          <Badge variant={device.is_active ? 'default' : 'secondary'}>
+                            {device.is_active ? 'Active' : 'Inactive'}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="ml-4 flex gap-2">
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleDisconnectUser(user.id)}
+                          onClick={() => handleUnblacklistUser(
+                            device.user_id, 
+                            device.mac_address, 
+                            device.device_name || 'Device'
+                          )}
+                          disabled={actionLoading === device.user_id}
                         >
-                          Disconnect
+                          <ShieldOff className="h-4 w-4 mr-1" />
+                          Unblacklist
                         </Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="payments">
-          <Card>
-            <CardHeader>
-              <CardTitle>Payment History</CardTitle>
-              <CardDescription>
-                View all M-Pesa transactions and revenue
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {payments.map((payment) => (
-                  <div key={payment.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-4">
-                        <div>
-                          <h4 className="font-medium">{payment.user}</h4>
-                          <p className="text-sm text-muted-foreground">{payment.phone}</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="font-medium">{payment.plan}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {payment.date.toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-lg font-bold text-success">Ksh {payment.amount}</p>
-                          <Badge variant="outline" className="text-success">
-                            {payment.status}
-                          </Badge>
-                        </div>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleBlacklistUser(
+                            device.user_id, 
+                            device.mac_address, 
+                            device.device_name || 'Device'
+                          )}
+                          disabled={actionLoading === device.user_id}
+                        >
+                          <Shield className="h-4 w-4 mr-1" />
+                          Blacklist
+                        </Button>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="settings">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Network Settings</CardTitle>
-                <CardDescription>
-                  Configure your WiFi network parameters
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-4 bg-muted rounded-lg">
-                  <h4 className="font-medium mb-2">Network Status</h4>
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 bg-success rounded-full mr-2"></div>
-                    <span className="text-sm">Online - All systems operational</span>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <h4 className="font-medium">Quick Actions</h4>
-                  <div className="space-y-2">
-                    <Button variant="outline" className="w-full justify-start">
-                      <Wifi className="h-4 w-4 mr-2" />
-                      Restart Network
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start">
-                      <Users className="h-4 w-4 mr-2" />
-                      Disconnect All Users
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Plan Configuration</CardTitle>
-                <CardDescription>
-                  Manage pricing and plan options
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center p-3 border rounded">
-                    <span>2 Hours Plan</span>
-                    <span className="font-medium">Ksh 10</span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 border rounded">
-                    <span>1 Day Plan</span>
-                    <span className="font-medium">Ksh 20</span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 border rounded">
-                    <span>1 Week Plan</span>
-                    <span className="font-medium">Ksh 150</span>
-                  </div>
-                </div>
-                <Button variant="outline" className="w-full">
-                  Edit Pricing
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
         </TabsContent>
       </Tabs>
     </div>
