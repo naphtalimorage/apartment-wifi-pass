@@ -197,152 +197,79 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
         </Card>
       </div>
 
-      {/* Detailed Views */}
-      <Tabs defaultValue="sessions" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="sessions">Active Sessions</TabsTrigger>
-          <TabsTrigger value="devices">User Devices</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="sessions">
-          <Card>
-            <CardHeader>
-              <CardTitle>Currently Connected Users</CardTitle>
-              <CardDescription>
-                Real-time view of active internet sessions with manual controls
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {activeSessions.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">
-                    No active sessions found
-                  </p>
-                ) : (
-                  activeSessions.map((session) => {
-                    const timeRemaining = formatTimeRemaining(session.end_time);
-                    const isExpired = new Date(session.end_time) <= new Date();
-                    
-                    return (
-                      <div key={session.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-4">
-                            <div>
-                              <h4 className="font-medium">{session.users.full_name}</h4>
-                              <p className="text-sm text-muted-foreground">{session.users.email}</p>
-                              <p className="text-sm text-muted-foreground">{session.users.phone_number}</p>
-                            </div>
-                            <div className="text-center">
-                              <Badge variant={isExpired ? 'destructive' : 'default'}>
-                                {timeRemaining}
-                              </Badge>
-                              <p className="text-sm text-muted-foreground mt-1">{session.data_plans.name}</p>
-                            </div>
-                            <div className="text-center">
-                              <p className="text-sm font-medium">MAC: {session.mac_address || 'Not set'}</p>
-                              <p className="text-sm text-muted-foreground">IP: {session.ip_address || 'Not set'}</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-sm font-medium">Ksh {session.payments.amount_ksh}</p>
-                              <p className="text-xs text-muted-foreground">
-                                Data: {session.data_used_mb || 0} MB
-                              </p>
-                            </div>
-                          </div>
+      {/* Active Sessions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Currently Connected Users</CardTitle>
+          <CardDescription>
+            Real-time view of active internet sessions with manual controls
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {activeSessions.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">
+                No active sessions found
+              </p>
+            ) : (
+              activeSessions.map((session) => {
+                const timeRemaining = formatTimeRemaining(session.end_time);
+                const isExpired = new Date(session.end_time) <= new Date();
+                
+                return (
+                  <div key={session.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-4">
+                        <div>
+                          <h4 className="font-medium">{session.users.full_name}</h4>
+                          <p className="text-sm text-muted-foreground">{session.users.email}</p>
+                          <p className="text-sm text-muted-foreground">{session.users.phone_number}</p>
                         </div>
-                        <div className="ml-4 flex gap-2">
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleBlacklistUser(
-                              session.user_id, 
-                              session.mac_address, 
-                              session.users.full_name
-                            )}
-                            disabled={!session.mac_address || actionLoading === session.user_id}
-                          >
-                            <Shield className="h-4 w-4 mr-1" />
-                            {actionLoading === session.user_id ? 'Processing...' : 'Blacklist'}
-                          </Button>
-                          {!session.mac_address && (
-                            <Badge variant="outline" className="text-xs">
-                              No MAC Address
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="devices">
-          <Card>
-            <CardHeader>
-              <CardTitle>Registered User Devices</CardTitle>
-              <CardDescription>
-                View and manage user devices for blacklist control
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {userDevices.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">
-                    No devices registered yet
-                  </p>
-                ) : (
-                  userDevices.map((device) => (
-                    <div key={device.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-4">
-                          <div>
-                            <h4 className="font-medium">{device.device_name || 'Unnamed Device'}</h4>
-                            <p className="text-sm text-muted-foreground">MAC: {device.mac_address}</p>
-                          </div>
-                          <Badge variant={device.is_active ? 'default' : 'secondary'}>
-                            {device.is_active ? 'Active' : 'Inactive'}
+                        <div className="text-center">
+                          <Badge variant={isExpired ? 'destructive' : 'default'}>
+                            {timeRemaining}
                           </Badge>
+                          <p className="text-sm text-muted-foreground mt-1">{session.data_plans.name}</p>
                         </div>
-                      </div>
-                      <div className="ml-4 flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleUnblacklistUser(
-                            device.user_id, 
-                            device.mac_address, 
-                            device.device_name || 'Device'
-                          )}
-                          disabled={actionLoading === device.user_id}
-                        >
-                          <ShieldOff className="h-4 w-4 mr-1" />
-                          Unblacklist
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleBlacklistUser(
-                            device.user_id, 
-                            device.mac_address, 
-                            device.device_name || 'Device'
-                          )}
-                          disabled={actionLoading === device.user_id}
-                        >
-                          <Shield className="h-4 w-4 mr-1" />
-                          Blacklist
-                        </Button>
+                        <div className="text-center">
+                          <p className="text-sm font-medium">MAC: {session.mac_address || 'Not set'}</p>
+                          <p className="text-sm text-muted-foreground">IP: {session.ip_address || 'Not set'}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-medium">Ksh {session.payments.amount_ksh}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Data: {session.data_used_mb || 0} MB
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                    <div className="ml-4 flex gap-2">
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleBlacklistUser(
+                          session.user_id, 
+                          session.mac_address, 
+                          session.users.full_name
+                        )}
+                        disabled={!session.mac_address || actionLoading === session.user_id}
+                      >
+                        <Shield className="h-4 w-4 mr-1" />
+                        {actionLoading === session.user_id ? 'Processing...' : 'Blacklist'}
+                      </Button>
+                      {!session.mac_address && (
+                        <Badge variant="outline" className="text-xs">
+                          No MAC Address
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

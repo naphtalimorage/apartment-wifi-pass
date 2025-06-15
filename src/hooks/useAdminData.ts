@@ -29,18 +29,8 @@ interface UserSession {
   };
 }
 
-interface UserDevice {
-  id: string;
-  user_id: string;
-  mac_address: string;
-  device_name: string;
-  is_active: boolean;
-  created_at: string;
-}
-
 export const useAdminData = () => {
   const [activeSessions, setActiveSessions] = useState<UserSession[]>([]);
-  const [userDevices, setUserDevices] = useState<UserDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,7 +43,7 @@ export const useAdminData = () => {
           *,
           users!inner(full_name, email, phone_number),
           data_plans!inner(name, duration_hours, price_ksh),
-          payments!inner(amount_ksh, mpesa_transaction_id)
+          payments!user_sessions_payment_id_fkey(amount_ksh, mpesa_transaction_id)
         `)
         .eq('is_active', true)
         .order('created_at', { ascending: false });
@@ -63,23 +53,6 @@ export const useAdminData = () => {
     } catch (err) {
       console.error('Error fetching active sessions:', err);
       setError('Failed to fetch active sessions');
-    }
-  };
-
-  // Fetch user devices
-  const fetchUserDevices = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('user_devices')
-        .select('*')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setUserDevices(data || []);
-    } catch (err) {
-      console.error('Error fetching user devices:', err);
-      setError('Failed to fetch user devices');
     }
   };
 
@@ -149,7 +122,7 @@ export const useAdminData = () => {
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchActiveSessions(), fetchUserDevices()]);
+      await fetchActiveSessions();
       setLoading(false);
     };
 
@@ -165,13 +138,6 @@ export const useAdminData = () => {
       }, () => {
         fetchActiveSessions();
       })
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'user_devices'
-      }, () => {
-        fetchUserDevices();
-      })
       .subscribe();
 
     return () => {
@@ -181,12 +147,12 @@ export const useAdminData = () => {
 
   return {
     activeSessions,
-    userDevices,
+    userDevices: [], // Temporarily empty until types are regenerated
     loading,
     error,
     blacklistUser,
     unblacklistUser,
     monitorSessions,
-    refetch: () => Promise.all([fetchActiveSessions(), fetchUserDevices()])
+    refetch: fetchActiveSessions
   };
 };
