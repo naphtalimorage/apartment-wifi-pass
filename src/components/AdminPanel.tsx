@@ -1,12 +1,12 @@
-
 import React, { useState } from 'react';
-import { Users, CreditCard, Wifi, Timer, Shield, ShieldOff, RefreshCw, Play } from 'lucide-react';
+import { Users, CreditCard, Wifi, Timer, Shield, ShieldOff, RefreshCw, Play, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useAdminData } from '@/hooks/useAdminData';
+import { useAuth } from '@/hooks/useAuth';
 
 interface AdminPanelProps {
   onBack: () => void;
@@ -14,6 +14,7 @@ interface AdminPanelProps {
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
   const { toast } = useToast();
+  const { signOut } = useAuth();
   const {
     activeSessions,
     userDevices,
@@ -26,6 +27,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
   } = useAdminData();
   
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  const handleLogout = async () => {
+    await signOut();
+    onBack();
+  };
 
   const handleBlacklistUser = async (userId: string, macAddress: string, userName: string) => {
     setActionLoading(userId);
@@ -140,6 +146,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
           </Button>
           <Button variant="outline" onClick={onBack}>
             Back to Portal
+          </Button>
+          <Button variant="outline" onClick={handleLogout}>
+            <LogOut className="h-4 w-4 mr-2" />
+            Logout
           </Button>
         </div>
       </div>
