@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Wifi, LogOut } from 'lucide-react';
+import { Wifi, LogOut, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { User } from '@supabase/supabase-js';
@@ -8,11 +8,12 @@ import { User } from '@supabase/supabase-js';
 interface WifiHeaderProps {
   user: User | null;
   isAdmin: boolean;
+  userRole: 'admin' | 'user' | null;
   onAdminAccess: () => void;
   onLogout: () => void;
 }
 
-const WifiHeader = ({ user, isAdmin, onAdminAccess, onLogout }: WifiHeaderProps) => {
+const WifiHeader = ({ user, isAdmin, userRole, onAdminAccess, onLogout }: WifiHeaderProps) => {
   return (
     <header className="bg-white/80 backdrop-blur-md border-b sticky top-0 z-50">
       <div className="container mx-auto px-4 py-4">
@@ -28,19 +29,27 @@ const WifiHeader = ({ user, isAdmin, onAdminAccess, onLogout }: WifiHeaderProps)
           </div>
           
           <div className="flex items-center space-x-4">
-            {user && (
-              <Badge variant="outline" className="hidden sm:flex">
-                {isAdmin ? 'Admin' : 'Authenticated'}
+            {user && userRole && (
+              <Badge variant={userRole === 'admin' ? 'default' : 'outline'} className="hidden sm:flex">
+                {userRole === 'admin' && <Shield className="h-3 w-3 mr-1" />}
+                {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
               </Badge>
             )}
             
-            {!user && (
+            {user && isAdmin && (
               <Button variant="ghost" size="sm" onClick={onAdminAccess}>
-                Admin
+                <Shield className="h-4 w-4 mr-1" />
+                Admin Panel
               </Button>
             )}
             
-            {user && !isAdmin && (
+            {!user && (
+              <Badge variant="outline" className="hidden sm:flex">
+                Guest
+              </Badge>
+            )}
+            
+            {user && (
               <Button variant="ghost" size="sm" onClick={onLogout}>
                 <LogOut className="h-4 w-4 mr-1" />
                 Logout

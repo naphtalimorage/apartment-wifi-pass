@@ -14,10 +14,9 @@ interface Plan {
   popular?: boolean;
 }
 
-export const useSessionManager = (user: User | null, session: Session | null) => {
+export const useSessionManager = (user: User | null, session: Session | null, isAdmin: boolean) => {
   const [currentView, setCurrentView] = useState<CurrentView>('auth');
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [checkingSession, setCheckingSession] = useState(false);
 
   useEffect(() => {
@@ -66,8 +65,6 @@ export const useSessionManager = (user: User | null, session: Session | null) =>
     setCurrentView,
     selectedPlan,
     setSelectedPlan,
-    isAdmin,
-    setIsAdmin,
     checkingSession,
   };
 };

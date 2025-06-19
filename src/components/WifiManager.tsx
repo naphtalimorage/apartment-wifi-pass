@@ -3,6 +3,7 @@ import React from 'react';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useDataPlans } from '@/hooks/useDataPlans';
+import { useUserRole } from '@/hooks/useUserRole';
 import { useSessionManager } from '@/hooks/useSessionManager';
 import WifiHeader from './WifiHeader';
 import WifiMainContent from './WifiMainContent';
@@ -19,16 +20,15 @@ interface Plan {
 
 const WifiManager = () => {
   const { user, session, loading, signOut } = useAuth();
+  const { userRole, isAdmin, loading: roleLoading } = useUserRole(user);
   const { data: plans = [], isLoading: plansLoading } = useDataPlans();
   const {
     currentView,
     setCurrentView,
     selectedPlan,
     setSelectedPlan,
-    isAdmin,
-    setIsAdmin,
     checkingSession,
-  } = useSessionManager(user, session);
+  } = useSessionManager(user, session, isAdmin);
 
   // Convert database plans to component format
   const formattedPlans: Plan[] = plans.map(plan => ({
@@ -41,8 +41,12 @@ const WifiManager = () => {
   }));
 
   const handleAdminAccess = () => {
-    setIsAdmin(true);
-    setCurrentView('admin');
+    if (isAdmin) {
+      setCurrentView('admin');
+    } else {
+      // Non-admin users cannot access admin panel
+      console.log('Access denied: User is not an admin');
+    }
   };
 
   const handlePlanSelect = (plan: Plan) => {
@@ -58,11 +62,9 @@ const WifiManager = () => {
     await signOut();
     setCurrentView('auth');
     setSelectedPlan(null);
-    setIsAdmin(false);
   };
 
   const handleAdminBack = () => {
-    setIsAdmin(false);
     setCurrentView(user ? 'plans' : 'auth');
   };
 
@@ -74,13 +76,13 @@ const WifiManager = () => {
     setCurrentView('plans');
   };
 
-  if (loading || checkingSession) {
+  if (loading || roleLoading || checkingSession) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
           <p className="text-muted-foreground">
-            {loading ? 'Loading...' : 'Checking session...'}
+            {loading ? 'Loading...' : roleLoading ? 'Checking permissions...' : 'Checking session...'}
           </p>
         </div>
       </div>
@@ -92,6 +94,7 @@ const WifiManager = () => {
       <WifiHeader 
         user={user}
         isAdmin={isAdmin}
+        userRole={userRole}
         onAdminAccess={handleAdminAccess}
         onLogout={handleLogout}
       />
