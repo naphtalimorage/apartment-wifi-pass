@@ -10,6 +10,7 @@ interface AuthContextType {
   loading: boolean;
   signUp: (email: string, password: string, fullName: string, phone: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signInWithGoogle: () => Promise<{ error: any }>;
   signOut: () => Promise<void>;
 }
 
@@ -40,6 +41,38 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+
+        // Handle Google OAuth sign-up - create user profile if it doesn't exist
+        if (event === 'SIGNED_IN' && session?.user && session.user.app_metadata.provider === 'google') {
+          setTimeout(async () => {
+            try {
+              // Check if user profile already exists
+              const { data: existingUser } = await supabase
+                .from('users')
+                .select('id')
+                .eq('id', session.user.id)
+                .single();
+
+              // If user doesn't exist, create profile
+              if (!existingUser) {
+                const { error: profileError } = await supabase
+                  .from('users')
+                  .insert({
+                    id: session.user.id,
+                    email: session.user.email!,
+                    full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || '',
+                    phone_number: session.user.user_metadata?.phone_number || ''
+                  });
+
+                if (profileError) {
+                  console.error('Error creating Google user profile:', profileError);
+                }
+              }
+            } catch (error) {
+              console.error('Error handling Google OAuth user:', error);
+            }
+          }, 0);
+        }
       }
     );
 
@@ -108,6 +141,26 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return { error };
   };
 
+  const signInWithGoogle = async () => {
+    const redirectUrl = `${window.location.origin}/`;
+    
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: redirectUrl,
+      }
+    });
+
+    if (!error) {
+      toast({
+        title: "Redirecting to Google...",
+        description: "You'll be redirected to Google to complete sign in.",
+      });
+    }
+
+    return { error };
+  };
+
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
     if (!error) {
@@ -124,6 +177,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     loading,
     signUp,
     signIn,
+    signInWithGoogle,
     signOut,
   };
 
